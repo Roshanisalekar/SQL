@@ -1,4 +1,10 @@
--- DML :- Data manipulation language
+--                                   DML :- Data manipulation language
+
+DML commands are used for manipulating the data stored in the table
+and not the table itself.
+  
+DML commands are not auto-committed. It means changes are not
+permanent to database, they can be rolled back.
 ---------------------------------------------------------------------------------------------------------------
 -- 1> insert :- insert into value in existing table 
 -- 2> upadate :- update is used tospecific  data updated in table
