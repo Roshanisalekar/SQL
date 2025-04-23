@@ -1,12 +1,20 @@
 #                             sql command   
 
-#                         DDL :-  data defination language 
+#                         DDL :-  data defination language
+
+This includes changes to the structure of the table like creation of
+table, altering table, deleting a table etc.All DDL commands are autocommitted. That means it saves all the changes permanently in the
+database.
+
 --------------------------------------------------------------------------------------------------------------------------
-# 1> create : The CREATE TABLE statement is used to create a new table in a database.
+  Command          Description
+  
+-- 1> create : The CREATE TABLE statement is used to create a new table in a database.
 -- 2> drop :- The DROP TABLE statement is used to drop an existing table in a database.
 -- 3> alter :- The ALTER TABLE statement is used to add, delete, or modify columns in an existing table.
 -- The ALTER TABLE statement is also used to add and drop various constraints on an existing table.
--- 4> truncate :- 5> rename 
+-- 4> truncate :- truncate delete data from table 
+-- 5> rename :- rename column ,table name 
 --------------------------------------------------------------------------------------------------------------------
 # syntax :-  1   ########### create ########################
 -- create database database_name;
