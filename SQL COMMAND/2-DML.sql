@@ -9,7 +9,7 @@ permanent to database, they can be rolled back.
 -- 1> insert :- insert into value in existing table 
 -- 2> upadate :- update is used tospecific  data updated in table
 -- 3> delete :- delete is used to delete data from table but unique data
--- 4> select :- it is used show the table 
+-- 4> select :- it is used show the table and retrive the information .
 --------------------------------------------------------------------------------------------------------------------
 use data;
 create table employee(id int ,name varchar(30),age int ,contact bigint,date date ,incoming_time time ,outgoing_time time ,post char(20),salary float); 
@@ -46,10 +46,40 @@ update employee set name="pratik patil" where id=2;
 -- delete from table_name where condition  
 -- example :- 
 delete from employee where id=5;
-
+-----------------------------------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------------------------------
--- syntax 4:-
--- select * from table_name;
+--   SELECT : 
+-- The SELECT statement is used to select data from a database.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+-- Syntax : 
+-- SELECT column1, column2, ...
+-- FROM table_name;
+
 -- example :- 
-select * from employee;
---------------------------------------------------------------------------------------------------------------------
+create database selte;
+use selte;
+create table employee(id int,name varchar(30),age int,city varchar(30), check(age>=18 and city="mumbai"));
+insert into  employee values( 1,"roshani",34,"mumbai");
+insert into  employee values( 2,"savita",44,"mumbai");
+
+select id, name from employee;
+---------------------------------------------------------------------------------------------------------------------
+-- Syntax : 
+-- SELECT column1
+-- FROM table_name;
+
+-- example :- 
+select name from employee;
+
+-------------------------------------------------------------------------------------------------------------------------
+
+-- Select ALL columns
+
+-- Syntax : 
+-- SELECT *
+-- FROM table_name;
+
+-- example :- 
+select * from empolyee;
+
+------------------------------------------------------------------------------------------------------------------------------------------
