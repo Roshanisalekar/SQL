@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Query Quest: A MySQL Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Fira+Code&display=swap');
+        
+        :root {
+            --bg-dark: #111827;
+            --bg-light: #1f2937;
+            --primary: #4f46e5;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --text-light: #d1d5db;
+            --text-dark: #9ca3af;
+            --border: #374151;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow: hidden;
+        }
+
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        }
+        .screen.active { opacity: 1; pointer-events: auto; }
+
+        .level-select-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 6xl;
+            padding: 2rem;
+        }
+
+        .world-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .world-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 30px var(--primary);
+        }
+        .world-card .world-icon { font-size: 3rem; color: var(--accent); }
+        .world-card .world-title { font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-light); }
+        .world-card .world-desc { font-size: 0.9rem; color: var(--text-dark); }
+        .world-card .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 5px;
+            background-color: var(--primary);
+            width: 0%; /* JS will update this */
+            transition: width 0.5s ease;
+        }
+
+        #game-screen {
+            justify-content: flex-start;
+            padding-top: 2rem;
+        }
+        
+        .level-container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 56rem;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .tabs { display: flex; border-bottom: 2px solid var(--border); }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 3px solid transparent;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .tab:hover { color: var(--text-light); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .tab-content { padding-top: 1.5rem; min-height: 250px; }
+        .content-pane { display: none; }
+        .content-pane.active { display: block; animation: fadeIn 0.5s ease; }
+        
+        .code-block {
+            background-color: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Fira Code', monospace;
+            margin-top: 1rem;
+            text-align: left;
+        }
+
+        .challenge-options {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .option-btn {
+            background-color: var(--border);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 400px;
+        }
+        .option-btn:hover { background-color: var(--primary); }
+        .option-btn.correct { background-color: var(--secondary); transform: scale(1.05); }
+        .option-btn.wrong { background-color: #ef4444; }
+
+        #level-nav {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        .nav-btn {
+            background: var(--primary);
+            padding: 0.5rem 1.5rem;
+            border-radius: 99px;
+            font-weight: 600;
+        }
+        .nav-btn:disabled { background: var(--border); color: var(--text-dark); cursor: not-allowed; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="level-select-screen" class="screen active">
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold">SQL Query Quest</h1>
+            <p class="text-xl text-gray-400 mt-2">Choose a world to master data aggregation.</p>
+        </div>
+        <div id="worlds-container" class="level-select-container"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <button id="back-to-menu" class="absolute top-4 left-4 nav-btn">← Menu</button>
+        <div class="level-container">
+            <div class="text-center">
+                <h2 id="level-title" class="text-3xl font-bold"></h2>
+                <p id="level-subtitle" class="text-lg text-gray-400"></p>
+            </div>
+            <div class="tabs mt-6">
+                <div class="tab active" data-tab="learn">Learn</div>
+                <div class="tab" data-tab="code">Code Example</div>
+                <div class="tab" data-tab="challenge">Challenge</div>
+            </div>
+            <div class="tab-content">
+                <div id="learn-pane" class="content-pane active"></div>
+                <div id="code-pane" class="content-pane"></div>
+                <div id="challenge-pane" class="content-pane"></div>
+            </div>
+            <div id="level-nav">
+                <button id="prev-level-btn" class="nav-btn">Previous Level</button>
+                <button id="next-level-btn" class="nav-btn">Next Level</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameData = {
+            "Aggregate Functions": {
+                icon: ' ',
+                description: "Functions that perform a calculation on a set of values and return a single summary value.",
+                levels: [
+                    { name: 'COUNT()', learn: 'Counts the number of rows that match a specified criterion. Use `COUNT(*)` to count all rows, or `COUNT(column)` to count non-NULL values in a column.', code: "SELECT COUNT(product_id) FROM products;", challenge: { q: 'Which function counts the number of rows?', a: 'COUNT()', o: ['SUM()', 'COUNT()', 'TOTAL()'] } },
+                    { name: 'SUM()', learn: 'Calculates the total sum of a numeric column.', code: "SELECT SUM(price) FROM order_details WHERE order_id = 101;", challenge: { q: 'To get the total of all salaries, you would use:', a: 'SUM(salary)', o: ['COUNT(salary)', 'SUM(salary)', 'AVG(salary)'] } },
+                    { name: 'AVG()', learn: 'Calculates the average value of a numeric column.', code: "SELECT AVG(rating) FROM reviews WHERE product_id = 5;", challenge: { q: 'What is the SQL function for finding the average?', a: 'AVG()', o: ['AVERAGE()', 'MEAN()', 'AVG()'] } },
+                    { name: 'MIN()', learn: 'Returns the smallest value of the selected column.', code: "SELECT MIN(price) FROM products;", challenge: { q: 'Which function finds the lowest price?', a: 'MIN()', o: ['MAX()', 'LOWEST()', 'MIN()'] } },
+                    { name: 'MAX()', learn: 'Returns the largest value of the selected column.', code: "SELECT MAX(salary) FROM employees;", challenge: { q: 'Which function finds the highest score?', a: 'MAX()', o: ['MAX()', 'HIGH()', 'TOP()'] } },
+                ]
+            },
+            "GROUP BY Clause": {
+                icon: '📊',
+                description: "Group rows that have the same values into summary rows, like 'find the number of customers in each country'.",
+                levels: [
+                    { name: 'Intro to GROUP BY', learn: 'The `GROUP BY` statement groups rows that have the same values in specified columns into summary rows. It is often used with aggregate functions to perform calculations on each group.', code: "SELECT department, COUNT(*) FROM employees\nGROUP BY department;", challenge: { q: 'What is the main purpose of `GROUP BY`?', a: 'To group rows for aggregate functions', o: ['To sort rows', 'To filter rows', 'To group rows for aggregate functions'] } },
+                    { name: 'GROUP BY with COUNT()', learn: 'Use this combination to count the number of items in each category. For example, counting the number of employees in each department.', code: "SELECT category, COUNT(product_id) FROM products\nGROUP BY category;", challenge: { q: 'How do you count products in each `category`?', a: 'GROUP BY category', o: ['ORDER BY category', 'GROUP BY category', 'WHERE category'] } },
+                    { name: 'GROUP BY with SUM()', learn: 'Use this to find the total sum for each group. For example, calculating the total sales for each sales representative.', code: "SELECT salesperson_id, SUM(sale_amount) FROM sales\nGROUP BY salesperson_id;", challenge: { q: 'To get total sales per `region`, you would use:', a: 'SUM(sales) GROUP BY region', o: ['SUM(sales) GROUP BY region', 'COUNT(sales) GROUP BY region', 'AVG(sales) WHERE region'] } },
+                    { name: 'GROUP BY with AVG()', learn: 'Use this to calculate the average value for each group, such as the average salary for each job title.', code: "SELECT job_title, AVG(salary) FROM employees\nGROUP BY job_title;", challenge: { q: 'How to find the average score for each `team`?', a: 'AVG(score) GROUP BY team', o: ['AVG(score) GROUP BY team', 'AVG(score) ORDER BY team', 'SUM(score) GROUP BY team'] } },
+                ]
+            },
+            "HAVING Clause": {
+                icon: '🔎',
+                description: "Filter the results of a `GROUP BY` query. `WHERE` filters rows before grouping, `HAVING` filters groups after.",
+                levels: [
+                    { name: 'Intro to HAVING', learn: 'The `HAVING` clause was added to SQL because the `WHERE` keyword could not be used with aggregate functions. It allows you to filter groups created by `GROUP BY`.', code: "SELECT department, COUNT(*) FROM employees\nGROUP BY department\nHAVING COUNT(*) > 10;", challenge: { q: 'When do you use `HAVING`?', a: 'To filter groups after `GROUP BY`', o: ['To filter rows before grouping', 'To sort groups', 'To filter groups after `GROUP BY`'] } },
+                    { name: 'HAVING vs WHERE', learn: '`WHERE` filters individual rows *before* they are grouped. `HAVING` filters the groups themselves *after* the aggregate functions have been calculated.', code: "-- Find departments with more than 5 employees who were hired after 2020\nSELECT department, COUNT(*) FROM employees\nWHERE hire_date > '2020-01-01'\nGROUP BY department\nHAVING COUNT(*) > 5;", challenge: { q: 'Which clause filters rows BEFORE aggregation?', a: 'WHERE', o: ['WHERE', 'HAVING', 'GROUP BY'] } },
+                    { name: 'HAVING with SUM()', learn: 'You can use `HAVING` to filter groups based on their total sum. For example, finding all departments whose total salary budget exceeds $500,000.', code: "SELECT department, SUM(salary) FROM employees\nGROUP BY department\nHAVING SUM(salary) > 500000;", challenge: { q: 'Find categories with total sales > 10000', a: 'HAVING SUM(sales) > 10000', o: ['WHERE SUM(sales) > 10000', 'HAVING SUM(sales) > 10000', 'GROUP BY SUM(sales) > 10000'] } },
+                ]
+            },
+        };
+
+        const worldsContainer = document.getElementById('worlds-container');
+        const levelSelectScreen = document.getElementById('level-select-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const backToMenuBtn = document.getElementById('back-to-menu');
+        
+        const levelTitle = document.getElementById('level-title');
+        const levelSubtitle = document.getElementById('level-subtitle');
+        const learnPane = document.getElementById('learn-pane');
+        const codePane = document.getElementById('code-pane');
+        const challengePane = document.getElementById('challenge-pane');
+        
+        const tabs = document.querySelectorAll('.tab');
+        const contentPanes = document.querySelectorAll('.content-pane');
+
+        const prevLevelBtn = document.getElementById('prev-level-btn');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+
+        let currentWorld = null;
+        let currentLevelIndex = 0;
+
+        function init() {
+            worldsContainer.innerHTML = ''; // Clear existing cards
+            for (const worldName in gameData) {
+                const world = gameData[worldName];
+                const card = document.createElement('div');
+                card.className = 'world-card';
+                card.innerHTML = `
+                    <div class="world-icon">${world.icon}</div>
+                    <h3 class="world-title">${worldName}</h3>
+                    <p class="world-desc">${world.description}</p>
+                    <div class="progress-bar"></div>
+                `;
+                card.addEventListener('click', () => selectWorld(worldName));
+                worldsContainer.appendChild(card);
+            }
+
+            backToMenuBtn.addEventListener('click', showMenu);
+            tabs.forEach(tab => tab.addEventListener('click', () => selectTab(tab.dataset.tab)));
+            prevLevelBtn.addEventListener('click', () => changeLevel(-1));
+            nextLevelBtn.addEventListener('click', () => changeLevel(1));
+        }
+
+        function selectWorld(worldName) {
+            currentWorld = worldName;
+            currentLevelIndex = 0;
+            levelSelectScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            loadLevel();
+        }
+
+        function showMenu() {
+            gameScreen.classList.remove('active');
+            levelSelectScreen.classList.add('active');
+        }
+
+        function loadLevel() {
+            const world = gameData[currentWorld];
+            const level = world.levels[currentLevelIndex];
+
+            levelTitle.textContent = `${level.name}`;
+            levelSubtitle.textContent = `${currentWorld} - Level ${currentLevelIndex + 1} of ${world.levels.length}`;
+
+            learnPane.innerHTML = `<p class="text-xl">${level.learn}</p>`;
+            codePane.innerHTML = `<div class="code-block"><pre><code>${level.code}</code></pre></div>`;
+            
+            const challenge = level.challenge;
+            challengePane.innerHTML = `
+                <p class="text-xl mb-4">${challenge.q}</p>
+                <div class="challenge-options">
+                    ${challenge.o.map(opt => `<button class="option-btn" data-answer="${opt}">${opt}</button>`).join('')}
+                </div>
+            `;
+            
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => checkAnswer(e.target, challenge.a));
+            });
+
+            prevLevelBtn.disabled = currentLevelIndex === 0;
+            nextLevelBtn.disabled = currentLevelIndex === world.levels.length - 1;
+            
+            selectTab('learn');
+        }
+
+        function selectTab(tabName) {
+            tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === `${tabName}-pane`));
+        }
+
+        function checkAnswer(button, correctAnswer) {
+            const buttons = button.parentElement.querySelectorAll('.option-btn');
+            buttons.forEach(btn => btn.disabled = true); // Disable all options after one is clicked
+
+            if (button.textContent === String(correctAnswer)) {
+                button.classList.add('correct');
+                setTimeout(() => changeLevel(1), 1000);
+            } else {
+                button.classList.add('wrong');
+                // Highlight the correct answer
+                buttons.forEach(btn => {
+                    if(btn.textContent === String(correctAnswer)) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+        }
+
+        function changeLevel(direction) {
+            const world = gameData[currentWorld];
+            const newIndex = currentLevelIndex + direction;
+            if (newIndex >= 0 && newIndex < world.levels.length) {
+                currentLevelIndex = newIndex;
+                loadLevel();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

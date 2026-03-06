@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Query Quest: A MySQL JOINs Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Fira+Code&display=swap');
+        
+        :root {
+            --bg-dark: #111827;
+            --bg-light: #1f2937;
+            --primary: #4f46e5;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --text-light: #d1d5db;
+            --text-dark: #9ca3af;
+            --border: #374151;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow: hidden;
+        }
+
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        }
+        .screen.active { opacity: 1; pointer-events: auto; }
+
+        .level-select-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 6xl;
+            padding: 2rem;
+        }
+
+        .world-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .world-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 30px var(--primary);
+        }
+        .world-card .world-icon { font-size: 3rem; color: var(--accent); }
+        .world-card .world-title { font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-light); }
+        .world-card .world-desc { font-size: 0.9rem; color: var(--text-dark); }
+        
+        #game-screen {
+            justify-content: flex-start;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        
+        .level-container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            width: 95%;
+            max-width: 64rem; /* Increased max-width */
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .tabs { display: flex; border-bottom: 2px solid var(--border); }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 3px solid transparent;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .tab:hover { color: var(--text-light); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .tab-content { padding-top: 1.5rem; min-height: 300px; max-height: 60vh; overflow-y: auto; }
+        .content-pane { display: none; }
+        .content-pane.active { display: block; animation: fadeIn 0.5s ease; }
+        
+        .code-block {
+            background-color: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Fira Code', monospace;
+            margin-top: 1rem;
+            text-align: left;
+            white-space: pre-wrap;
+            overflow-x: auto; /* Added for DDL script */
+        }
+
+        .challenge-options {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .option-btn {
+            background-color: var(--border);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+            max-width: 400px;
+        }
+        .option-btn:hover { background-color: var(--primary); }
+        .option-btn.correct { background-color: var(--secondary); transform: scale(1.05); }
+        .option-btn.wrong { background-color: #ef4444; }
+
+        #level-nav {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        .nav-btn {
+            background: var(--primary);
+            padding: 0.5rem 1.5rem;
+            border-radius: 99px;
+            font-weight: 600;
+        }
+        .nav-btn:disabled { background: var(--border); color: var(--text-dark); cursor: not-allowed; }
+
+        /* Table styles for data tab */
+        .data-section { display: flex; gap: 2rem; flex-wrap: wrap; }
+        .data-table-container { flex: 1; min-width: 250px; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+        .data-table th, .data-table td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        .data-table th { background-color: var(--primary); color: white; }
+        .data-table td { background-color: var(--bg-dark); }
+        .data-table-container h4 { font-size: 1.25rem; font-weight: 600; color: var(--accent); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="level-select-screen" class="screen active">
+        <div class="text-center mb-8">
+            <h1 class="text-5xl font-bold">SQL Query Quest: The World of JOINs</h1>
+            <p class="text-xl text-gray-400 mt-2">Choose a world to master combining data from multiple tables.</p>
+        </div>
+        <div id="worlds-container" class="level-select-container"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <button id="back-to-menu" class="absolute top-4 left-4 nav-btn">← Menu</button>
+        <div class="level-container">
+            <div class="text-center">
+                <h2 id="level-title" class="text-3xl font-bold"></h2>
+                <p id="level-subtitle" class="text-lg text-gray-400"></p>
+            </div>
+            <div class="tabs mt-6">
+                <div class="tab active" data-tab="learn">Learn</div>
+                <!-- New DDL Tab -->
+                <div class="tab" data-tab="ddl">Table Setup (DDL)</div>
+                <div class="tab" data-tab="code">Code Example</div>
+                <div class="tab" data-tab="data">Data & Output</div>
+                <div class="tab" data-tab="challenge">Challenge</div>
+            </div>
+            <div class="tab-content">
+                <div id="learn-pane" class="content-pane active"></div>
+                <!-- New DDL Pane -->
+                <div id="ddl-pane" class="content-pane"></div>
+                <div id="code-pane" class="content-pane"></div>
+                <div id="data-pane" class="content-pane"></div>
+                <div id="challenge-pane" class="content-pane"></div>
+            </div>
+            <div id="level-nav">
+                <button id="prev-level-btn" class="nav-btn">Previous Level</button>
+                <button id="next-level-btn" class="nav-btn">Next Level</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA DEFINITIONS ---
+
+        const ddlScript = `
+-- -----------------------------------------------------------
+-- DDL & DML SCRIPT: Customers and Departments Tables
+-- Used to demonstrate various JOIN types.
+-- -----------------------------------------------------------
+
+-- 1. DDL: Create the Departments table (Primary Key)
+CREATE TABLE Departments (
+    DepartmentID INT PRIMARY KEY,
+    DeptName VARCHAR(50) NOT NULL
+);
+
+-- 2. DDL: Create the Customers table (Relational Key)
+CREATE TABLE Customers (
+    CustomerID INT PRIMARY KEY,
+    Name VARCHAR(100) NOT NULL,
+    DepartmentID INT -- This column links to Departments.DepartmentID
+    -- Note: We omit a formal FOREIGN KEY constraint to allow non-matching IDs 
+    -- (like the NULL value for CustomerID 4) for join demonstrations.
+);
+
+-- 3. DML: Insert Department Data (Right Table)
+INSERT INTO Departments (DepartmentID, DeptName) VALUES 
+(101, 'Sales'),
+(102, 'Support'),
+(103, 'Marketing'); -- DeptID 103 has no customer in the Customer table
+
+-- 4. DML: Insert Customer Data (Left Table)
+INSERT INTO Customers (CustomerID, Name, DepartmentID) VALUES 
+(1, 'Alice', 101),
+(2, 'Bob', 102),
+(3, 'Charlie', 101),
+(4, 'David', NULL); -- CustomerID 4 is not assigned to any Department
+`;
+
+        const sampleTablesHTML = `
+            <div class="data-section">
+                <div class="data-table-container">
+                    <h4>Customers Table (Left)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>CustomerID</th><th>Name</th><th>DepartmentID</th></tr></thead>
+                        <tbody>
+                            <tr><td>1</td><td>Alice</td><td>101</td></tr>
+                            <tr><td>2</td><td>Bob</td><td>102</td></tr>
+                            <tr><td>3</td><td>Charlie</td><td>101</td></tr>
+                            <tr><td>4</td><td>David</td><td>NULL</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="data-table-container">
+                    <h4>Departments Table (Right)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>DepartmentID</th><th>DeptName</th></tr></thead>
+                        <tbody>
+                            <tr><td>101</td><td>Sales</td></tr>
+                            <tr><td>102</td><td>Support</td></tr>
+                            <tr><td>103</td><td>Marketing</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const gameData = {
+            "INNER JOIN": {
+                icon: '🤝',
+                description: "Selects records that have matching values in both tables.",
+                levels: [
+                    { 
+                        name: 'Intro to INNER JOIN', 
+                        learn: 'An **INNER JOIN** returns only the rows where the join condition is met in both tables. It finds the intersection of the data. Use it when you only want complete records from both sides. ', 
+                        code: "SELECT c.Name, d.DeptName\nFROM Customers c\nINNER JOIN Departments d ON c.DepartmentID = d.DepartmentID;", 
+                        data: `${sampleTablesHTML}
+                               <div class="data-table-container mt-8">
+                                   <h4>Query Output (Matching records only)</h4>
+                                   <table class="data-table">
+                                       <thead><tr><th>Name</th><th>DeptName</th></tr></thead>
+                                       <tbody>
+                                           <tr><td>Alice</td><td>Sales</td></tr>
+                                           <tr><td>Bob</td><td>Support</td></tr>
+                                           <tr><td>Charlie</td><td>Sales</td></tr>
+                                       </tbody>
+                                   </table>
+                               </div>`,
+                        challenge: { q: 'What does an INNER JOIN return?', a: 'Only matching rows from both tables', o: ['All rows from the left table', 'All rows from both tables', 'Only matching rows from both tables'] } 
+                    },
+                ]
+            },
+            "LEFT JOIN": {
+                icon: '🚶‍♂️➡️',
+                description: "Returns all records from the left table, and the matched records from the right table.",
+                 levels: [
+                    { 
+                        name: 'Intro to LEFT JOIN', 
+                        learn: 'A **LEFT JOIN** returns all rows from the left table (Customers) and the matching rows from the right table (Departments). If no match is found (like David), **NULL**s are returned for the right table columns. ', 
+                        code: "SELECT c.Name, d.DeptName\nFROM Customers c\nLEFT JOIN Departments d ON c.DepartmentID = d.DepartmentID;", 
+                        data: `${sampleTablesHTML}
+                               <div class="data-table-container mt-8">
+                                   <h4>Query Output (All Customers, matched Departments)</h4>
+                                   <table class="data-table">
+                                       <thead><tr><th>Name</th><th>DeptName</th></tr></thead>
+                                       <tbody>
+                                           <tr><td>Alice</td><td>Sales</td></tr>
+                                           <tr><td>Bob</td><td>Support</td></tr>
+                                           <tr><td>Charlie</td><td>Sales</td></tr>
+                                           <tr><td>David</td><td>NULL</td></tr>
+                                       </tbody>
+                                   </table>
+                               </div>`,
+                        challenge: { q: 'In a LEFT JOIN, what happens if a left table row has no match in the right table?', a: 'It returns NULL for the right table columns', o: ['It returns an error', 'It returns NULL for the right table columns', 'It skips the row entirely'] } 
+                    },
+                ]
+            },
+            "RIGHT JOIN": {
+                icon: '⬅️🚶‍♂️',
+                description: "Returns all records from the right table, and the matched records from the left table.",
+                levels: [
+                    { 
+                        name: 'Intro to RIGHT JOIN', 
+                        learn: 'A **RIGHT JOIN** is the reverse of a LEFT JOIN. It returns all rows from the right table (Departments) and matching rows from the left (Customers). If the right table row has no match (like Marketing), it returns **NULL** for the left table columns. ', 
+                        code: "SELECT c.Name, d.DeptName\nFROM Customers c\nRIGHT JOIN Departments d ON c.DepartmentID = d.DepartmentID;", 
+                        data: `${sampleTablesHTML}
+                               <div class="data-table-container mt-8">
+                                   <h4>Query Output (All Departments, matched Customers)</h4>
+                                   <table class="data-table">
+                                       <thead><tr><th>Name</th><th>DeptName</th></tr></thead>
+                                       <tbody>
+                                           <tr><td>Alice</td><td>Sales</td></tr>
+                                           <tr><td>Charlie</td><td>Sales</td></tr>
+                                           <tr><td>Bob</td><td>Support</td></tr>
+                                           <tr><td>NULL</td><td>Marketing</td></tr>
+                                       </tbody>
+                                   </table>
+                               </div>`,
+                        challenge: { q: 'Which table will have all its rows returned in a RIGHT JOIN?', a: 'The right table', o: ['The left table', 'The right table', 'Both tables'] } 
+                    },
+                ]
+            },
+            "FULL OUTER JOIN (Emulated)": {
+                icon: '🌐',
+                description: "Returns all records when there is a match in either the left or right table. MySQL emulates this with UNION.",
+                levels: [
+                    { 
+                        name: 'Emulating FULL JOIN', 
+                        learn: 'MySQL does not have a built-in `FULL OUTER JOIN`. We emulate it by combining a **LEFT JOIN** and a **RIGHT JOIN** with the **UNION** operator. This ensures all rows from both tables are included, with NULLs where matches do not exist. ', 
+                        code: `SELECT c.Name, d.DeptName
+FROM Customers c
+LEFT JOIN Departments d ON c.DepartmentID = d.DepartmentID
+UNION
+SELECT c.Name, d.DeptName
+FROM Customers c
+RIGHT JOIN Departments d ON c.DepartmentID = d.DepartmentID;`, 
+                        data: `${sampleTablesHTML}
+                               <div class="data-table-container mt-8">
+                                   <h4>Query Output (All records from both sides)</h4>
+                                   <table class="data-table">
+                                       <thead><tr><th>Name</th><th>DeptName</th></tr></thead>
+                                       <tbody>
+                                           <tr><td>Alice</td><td>Sales</td></tr>
+                                           <tr><td>Bob</td><td>Support</td></tr>
+                                           <tr><td>Charlie</td><td>Sales</td></tr>
+                                           <tr><td>David</td><td>NULL</td></tr>
+                                           <tr><td>NULL</td><td>Marketing</td></tr>
+                                       </tbody>
+                                   </table>
+                               </div>`,
+                        challenge: { q: 'How is FULL OUTER JOIN emulated in MySQL?', a: 'LEFT JOIN UNION RIGHT JOIN', o: ['LEFT JOIN AND RIGHT JOIN', 'LEFT JOIN UNION RIGHT JOIN', 'It is a built-in command'] } 
+                    },
+                ]
+            },
+            "CROSS JOIN": {
+                icon: '✖️',
+                description: "Returns the Cartesian product of the two tables – every row from the first table is combined with every row from the second.",
+                levels: [
+                    { 
+                        name: 'Intro to CROSS JOIN', 
+                        learn: 'A **CROSS JOIN** creates a **Cartesian product**, matching every row from the first table with every row from the second table. It does not need an `ON` clause. Be careful, as this can generate a very large number of rows! ', 
+                        code: "SELECT c.Name, d.DeptName\nFROM Customers c\nCROSS JOIN Departments d;", 
+                        data: `${sampleTablesHTML}
+                               <div class="data-table-container mt-8">
+                                   <h4>Query Output (Total Rows: 4 Customers * 3 Departments = 12 Rows)</h4>
+                                   <table class="data-table">
+                                       <thead><tr><th>Name</th><th>DeptName</th></tr></thead>
+                                       <tbody>
+                                           <tr><td>Alice</td><td>Sales</td></tr>
+                                           <tr><td>Alice</td><td>Support</td></tr>
+                                           <tr><td>Alice</td><td>Marketing</td></tr>
+                                           <tr><td>Bob</td><td>Sales</td></tr>
+                                           <tr><td>Bob</td><td>Support</td></tr>
+                                           <tr><td>Bob</td><td>Marketing</td></tr>
+                                           <tr><td>...</td><td>...</td></tr>
+                                       </tbody>
+                                   </table>
+                               </div>`,
+                        challenge: { q: 'A CROSS JOIN produces a...', a: 'Cartesian product', o: ['Intersection', 'Union', 'Cartesian product'] } 
+                    },
+                ]
+            },
+        };
+
+        // --- SCRIPT LOGIC ---
+        const worldsContainer = document.getElementById('worlds-container');
+        const levelSelectScreen = document.getElementById('level-select-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const backToMenuBtn = document.getElementById('back-to-menu');
+        
+        const levelTitle = document.getElementById('level-title');
+        const levelSubtitle = document.getElementById('level-subtitle');
+        const learnPane = document.getElementById('learn-pane');
+        const ddlPane = document.getElementById('ddl-pane'); // New pane reference
+        const codePane = document.getElementById('code-pane');
+        const dataPane = document.getElementById('data-pane');
+        const challengePane = document.getElementById('challenge-pane');
+        
+        const tabs = document.querySelectorAll('.tabs .tab');
+        const contentPanes = document.querySelectorAll('.tab-content .content-pane');
+
+        const prevLevelBtn = document.getElementById('prev-level-btn');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+
+        let currentWorld = null;
+        let currentLevelIndex = 0;
+
+        function init() {
+            worldsContainer.innerHTML = ''; 
+            for (const worldName in gameData) {
+                const world = gameData[worldName];
+                const card = document.createElement('div');
+                card.className = 'world-card';
+                card.innerHTML = `
+                    <div class="world-icon">${world.icon}</div>
+                    <h3 class="world-title">${worldName}</h3>
+                    <p class="world-desc">${world.description}</p>
+                `;
+                card.addEventListener('click', () => selectWorld(worldName));
+                worldsContainer.appendChild(card);
+            }
+
+            backToMenuBtn.addEventListener('click', showMenu);
+            tabs.forEach(tab => tab.addEventListener('click', () => selectTab(tab.dataset.tab)));
+            prevLevelBtn.addEventListener('click', () => changeLevel(-1));
+            nextLevelBtn.addEventListener('click', () => changeLevel(1));
+        }
+
+        function selectWorld(worldName) {
+            currentWorld = worldName;
+            currentLevelIndex = 0;
+            levelSelectScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            loadLevel();
+        }
+
+        function showMenu() {
+            gameScreen.classList.remove('active');
+            levelSelectScreen.classList.add('active');
+        }
+
+        function loadLevel() {
+            const world = gameData[currentWorld];
+            const level = world.levels[currentLevelIndex];
+
+            levelTitle.textContent = `${level.name}`;
+            levelSubtitle.textContent = `${currentWorld} - Level ${currentLevelIndex + 1} of ${world.levels.length}`;
+
+            learnPane.innerHTML = `<p class="text-xl">${level.learn}</p>`;
+            
+            // Populate DDL Pane with the complete setup script
+            ddlPane.innerHTML = `<h5 class="text-xl font-semibold mb-2 text-accent">Database Setup (Run this first!)</h5><div class="code-block"><pre><code>${ddlScript}</code></pre></div>`;
+
+            codePane.innerHTML = `<div class="code-block"><pre><code>${level.code}</code></pre></div>`;
+            dataPane.innerHTML = level.data || '<p>No data for this level.</p>';
+            
+            const challenge = level.challenge;
+            challengePane.innerHTML = `
+                <p class="text-xl mb-4">${challenge.q}</p>
+                <div class="challenge-options">
+                    ${challenge.o.map(opt => `<button class="option-btn" data-answer="${opt}">${opt}</button>`).join('')}
+                </div>
+            `;
+            
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                // Ensure buttons are re-enabled for the new level
+                btn.disabled = false;
+                btn.classList.remove('correct', 'wrong');
+                btn.addEventListener('click', (e) => checkAnswer(e.target, challenge.a));
+            });
+
+            prevLevelBtn.disabled = currentLevelIndex === 0;
+            nextLevelBtn.disabled = currentLevelIndex === world.levels.length - 1;
+            
+            selectTab('learn');
+        }
+
+        function selectTab(tabName) {
+            tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === `${tabName}-pane`));
+        }
+
+        function checkAnswer(button, correctAnswer) {
+            const buttons = button.parentElement.querySelectorAll('.option-btn');
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (button.textContent === String(correctAnswer)) {
+                button.classList.add('correct');
+                setTimeout(() => {
+                    if (currentLevelIndex < gameData[currentWorld].levels.length - 1) {
+                        changeLevel(1);
+                    }
+                }, 1000);
+            } else {
+                button.classList.add('wrong');
+                buttons.forEach(btn => {
+                    if(btn.textContent === String(correctAnswer)) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+        }
+
+        function changeLevel(direction) {
+            const world = gameData[currentWorld];
+            const newIndex = currentLevelIndex + direction;
+            if (newIndex >= 0 && newIndex < world.levels.length) {
+                currentLevelIndex = newIndex;
+                loadLevel();
+            }
+        }
+
+        init();
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"499e684b7b1043878977050a0a606794","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>

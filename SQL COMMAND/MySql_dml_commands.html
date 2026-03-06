@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Query Quest: MySQL DML Commands</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font family for modern look -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Fira+Code&display=swap');
+        
+        :root {
+            --bg-dark: #0f172a; /* Slate 900 */
+            --bg-light: #1e293b; /* Slate 800 */
+            --primary: #3b82f6; /* Blue 500 */
+            --secondary: #10b981; /* Emerald 500 */
+            --accent: #f97316; /* Orange 500 */
+            --text-light: #e2e8f0; /* Slate 200 */
+            --text-dark: #94a3b8; /* Slate 400 */
+            --border: #334155; /* Slate 700 */
+            --correct: #10b981; /* Emerald 500 */
+            --wrong: #ef4444; /* Red 500 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow: hidden;
+        }
+
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease-in-out;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        }
+        .screen.active { opacity: 1; pointer-events: auto; }
+
+        .level-select-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 6xl;
+            padding: 2rem;
+        }
+
+        .world-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        .world-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3), 0 0 20px rgba(59, 130, 246, 0.5); /* Primary glow */
+            background-color: #2b3a50;
+        }
+        .world-card .world-icon { font-size: 3rem; color: var(--accent); }
+        .world-card .world-title { font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: var(--text-light); }
+        .world-card .world-desc { font-size: 0.9rem; color: var(--text-dark); }
+        
+        #game-screen {
+            justify-content: flex-start;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        
+        .level-container {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            width: 95%;
+            max-width: 6xl; /* Increased max-width */
+            padding: 2rem;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        }
+
+        .tabs { display: flex; border-bottom: 2px solid var(--border); }
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-dark);
+            border-bottom: 3px solid transparent;
+            transition: color 0.3s, border-color 0.3s;
+        }
+        .tab:hover { color: var(--text-light); }
+        .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .tab-content { padding-top: 1.5rem; min-height: 300px; max-height: 60vh; overflow-y: auto; }
+        .content-pane { display: none; }
+        .content-pane.active { display: block; animation: fadeIn 0.5s ease; }
+        
+        .code-block {
+            background-color: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Fira Code', monospace;
+            margin-top: 1rem;
+            text-align: left;
+            white-space: pre-wrap;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #level-nav {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        .nav-btn {
+            background: var(--primary);
+            padding: 0.6rem 2rem;
+            border-radius: 99px;
+            font-weight: 600;
+            transition: background 0.3s ease, transform 0.2s;
+        }
+        .nav-btn:hover { background: #2563eb; }
+        .nav-btn:disabled { 
+            background: var(--border); 
+            color: var(--text-dark); 
+            cursor: not-allowed; 
+            box-shadow: none; 
+            transform: none;
+        }
+
+        /* Table styles for data tab */
+        .data-section { display: flex; gap: 2rem; flex-wrap: wrap; }
+        .data-table-container { flex: 1; min-width: 280px; }
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; border-radius: 0.5rem; overflow: hidden; margin-top: 0.5rem; }
+        .data-table th, .data-table td { 
+            border: 1px solid var(--border); 
+            padding: 10px; 
+            text-align: left; 
+            border-top: none; 
+        }
+        .data-table th { 
+            background-color: var(--primary); 
+            color: white; 
+            font-weight: 700;
+        }
+        .data-table td { background-color: #1f3045; } /* Slightly lighter than bg-light */
+        .data-table-container h4 { font-size: 1.25rem; font-weight: 600; color: var(--accent); margin-bottom: 0.5rem; }
+
+        /* Styling for the Errors pane */
+        .error-list {
+            list-style: none;
+            padding: 0;
+        }
+        .error-list li {
+            background-color: #2b3a50; /* Slightly darker than bg-light */
+            border-left: 4px solid var(--wrong); /* Red border */
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .error-list strong {
+            color: #fca5a5; /* Light red */
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Styling for MCQ buttons */
+        .option-btn {
+            background: #334155; /* Slate 700 */
+            color: var(--text-light);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background 0.3s ease, transform 0.1s;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 0.75rem;
+        }
+        .option-btn:hover:not(:disabled) {
+            background: #475569; /* Slate 600 */
+            transform: scale(1.02);
+        }
+        .option-btn.correct {
+            background: var(--correct);
+            color: white;
+            box-shadow: 0 0 10px var(--correct);
+        }
+        .option-btn.wrong {
+            background: var(--wrong);
+            color: white;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .level-select-container { grid-template-columns: 1fr; }
+            .data-section { flex-direction: column; }
+            .tab { padding: 0.75rem 0.75rem; font-size: 0.9rem; }
+            .level-container { padding: 1rem; }
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="level-select-screen" class="screen active">
+        <div class="text-center mb-10 p-4 rounded-lg bg-slate-800/50 shadow-xl">
+            <h1 class="text-5xl font-bold text-primary">SQL Query Quest: MySQL DML Commands</h1>
+            <p class="text-xl text-gray-400 mt-3">Learn to manipulate data using INSERT, UPDATE, and DELETE.</p>
+        </div>
+        <div id="worlds-container" class="level-select-container"></div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <button id="back-to-menu" class="absolute top-4 left-4 nav-btn bg-slate-700 hover:bg-slate-600 transition">← Menu</button>
+        <div class="level-container">
+            <div class="text-center">
+                <h2 id="level-title" class="text-3xl font-bold"></h2>
+                <p id="level-subtitle" class="text-lg text-gray-400"></p>
+            </div>
+            <div class="tabs mt-6">
+                <div class="tab active" data-tab="learn">Learn</div>
+                <div class="tab" data-tab="ddl">Table Setup (DDL)</div>
+                <div class="tab" data-tab="code">Example & Syntax</div>
+                <div class="tab" data-tab="data">Data Context</div>
+                <div class="tab" data-tab="errors">Potential Errors</div>
+                <div class="tab" data-tab="mcq">Challenge (MCQ)</div>
+            </div>
+            <div class="tab-content">
+                <div id="learn-pane" class="content-pane active"></div>
+                <div id="ddl-pane" class="content-pane"></div>
+                <div id="code-pane" class="content-pane"></div>
+                <div id="data-pane" class="content-pane"></div>
+                <div id="errors-pane" class="content-pane"></div>
+                <div id="mcq-pane" class="content-pane"></div>
+            </div>
+            <div id="level-nav">
+                <button id="prev-level-btn" class="nav-btn">Previous Command</button>
+                <button id="next-level-btn" class="nav-btn">Next Command</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA DEFINITIONS ---
+
+        const ddlScript = `
+-- -----------------------------------------------------------
+-- DDL SCRIPT: Table Structures
+-- -----------------------------------------------------------
+
+-- Parent Table: Vendors
+CREATE TABLE Vendors (
+    VendorID INT PRIMARY KEY,
+    VendorName VARCHAR(100) NOT NULL
+);
+
+-- Child Table: Products
+CREATE TABLE Products (
+    ProductID INT PRIMARY KEY,
+    Name VARCHAR(50) NOT NULL,
+    Price DECIMAL(10, 2) NOT NULL CHECK (Price >= 0),
+    Stock INT DEFAULT 0,
+    VendorID INT,
+    -- Foreign Key Constraint links Products to Vendors
+    FOREIGN KEY (VendorID) REFERENCES Vendors(VendorID)
+);
+`;
+
+        const dmlTablesHTML = `
+            <p class="text-lg text-gray-300 mb-4">The following table structure is used for all examples:</p>
+            <div class="data-section">
+                <div class="data-table-container">
+                    <h4>Products Table (Initial State)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>ProductID</th><th>Name</th><th>Price</th><th>Stock</th><th>VendorID</th></tr></thead>
+                        <tbody>
+                            <tr><td>101</td><td>Laptop Pro</td><td>1200.00</td><td>50</td><td>1</td></tr>
+                            <tr><td>102</td><td>Monitor 4K</td><td>350.50</td><td>25</td><td>1</td></tr>
+                            <tr><td>103</td><td>Webcam HD</td><td>45.99</td><td>100</td><td>2</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="data-table-container">
+                    <h4>Vendors Table (Initial State)</h4>
+                    <table class="data-table">
+                        <thead><tr><th>VendorID (PK)</th><th>VendorName</th></tr></thead>
+                        <tbody>
+                            <tr><td>1</td><td>Tech Supplies</td></tr>
+                            <tr><td>2</td><td>Office Essentials</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        const gameData = {
+            "INSERT": {
+                icon: '➕',
+                description: "Adds new rows (records) to a table.",
+                levels: [
+                    { 
+                        name: 'Inserting a Single Record', 
+                        learn: 'The **INSERT INTO** statement is used to add new rows of data into a table. You must ensure the data types and order of values match the target columns, or explicitly list the columns you are inserting into.', 
+                        code: `INSERT INTO Products (ProductID, Name, Price, Stock, VendorID)
+VALUES (104, 'Wireless Mouse', 25.99, 200, 2);
+
+-- Example with column list omitted (risky, requires ALL columns in order):
+-- INSERT INTO Products VALUES (105, 'Keyboard Mechanical', 75.00, 150, 1);`, 
+                        errors: `<ul class="error-list">
+                            <li><strong>ERROR: Column count doesn't match value count</strong>: Happens if you don't list columns but fail to provide values for every single column in the table.</li>
+                            <li><strong>ERROR: Duplicate entry for primary key 'XXX'</strong>: Occurs if you try to insert a ProductID that already exists.</li>
+                            <li><strong>ERROR: Cannot add or update a child row: a foreign key constraint fails</strong>: If you try to insert a product with a VendorID that does not exist in the Vendors table (e.g., VendorID = 99).</li>
+                        </ul>`,
+                        mcq: {
+                            question: "When using INSERT INTO, what is the best practice to prevent errors if the table schema changes?",
+                            options: ["Use the VALUES clause only.", "Always explicitly list the target columns.", "Avoid inserting Primary Keys.", "Insert only one row at a time."],
+                            answer: "Always explicitly list the target columns."
+                        }
+                    },
+                ]
+            },
+            "UPDATE": {
+                icon: '📝',
+                description: "Modifies existing data in rows and columns.",
+                 levels: [
+                    { 
+                        name: 'Updating Data with WHERE', 
+                        learn: 'The **UPDATE** statement is used to modify existing records in a table. It is critical to use the **WHERE** clause to specify exactly which rows to change. **Without a WHERE clause, all rows in the table will be updated!**', 
+                        code: `UPDATE Products
+SET Price = 1250.00, Stock = Stock - 5
+WHERE ProductID = 101;
+
+-- Update multiple rows (e.g., 5% price increase for all products under 100):
+-- UPDATE Products SET Price = Price * 1.05 WHERE Price < 100;`, 
+                        errors: `<ul class="error-list">
+                            <li><strong>WARNING: Missing WHERE Clause</strong>: A logical error that updates every single row in the table, often resulting in massive data corruption.</li>
+                            <li><strong>ERROR: Data truncation for column 'Price'</strong>: Trying to set a numeric column to a value too large for its defined precision or to a non-numeric string.</li>
+                            <li><strong>ERROR: Cannot update 'XXX'</strong>: May occur if you attempt to update a foreign key value (VendorID) to a value that doesn't exist in the parent table (Vendors).</li>
+                        </ul>`,
+                        mcq: {
+                            question: "Which clause is essential in an UPDATE statement to target only specific rows?",
+                            options: ["SET", "FROM", "WHERE", "SELECT"],
+                            answer: "WHERE"
+                        }
+                    },
+                ]
+            },
+            "DELETE": {
+                icon: '🗑️',
+                description: "Removes one or more rows from a table.",
+                levels: [
+                    { 
+                        name: 'Deleting Specific Records', 
+                        learn: 'The **DELETE FROM** statement is used to remove existing rows from a table. Like UPDATE, the **WHERE** clause is essential to target specific rows. Deleting without a WHERE clause will empty the entire table, but the table structure itself remains.', 
+                        code: `DELETE FROM Products
+WHERE ProductID = 103;
+
+-- Delete all products from a specific vendor (VendorID 2):
+-- DELETE FROM Products WHERE VendorID = 2;`, 
+                        errors: `<ul class="error-list">
+                            <li><strong>WARNING: Missing WHERE Clause</strong>: This will delete *all* rows in the table, emptying all data. It is irreversible unless a transaction is used.</li>
+                            <li><strong>ERROR: Cannot delete or update a parent row: a foreign key constraint fails</strong>: This happens if you try to delete a row (e.g., a Vendor) that is referenced by a Foreign Key in the child table (Products), and the FK constraint prevents cascading deletions.</li>
+                            <li><strong>ERROR: Unknown column 'XXX' in 'where clause'</strong>: A simple typo in the WHERE clause column name will prevent the command from running.</li>
+                        </ul>`,
+                        mcq: {
+                            question: "What is the primary difference between DELETE FROM table and TRUNCATE TABLE?",
+                            options: ["DELETE is faster.", "TRUNCATE can be rolled back.", "DELETE uses a WHERE clause; TRUNCATE does not.", "TRUNCATE only affects stored procedures."],
+                            answer: "DELETE uses a WHERE clause; TRUNCATE does not."
+                        }
+                    },
+                ]
+            },
+        };
+
+        // --- SCRIPT LOGIC ---
+        const worldsContainer = document.getElementById('worlds-container');
+        const levelSelectScreen = document.getElementById('level-select-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const backToMenuBtn = document.getElementById('back-to-menu');
+        
+        const levelTitle = document.getElementById('level-title');
+        const levelSubtitle = document.getElementById('level-subtitle');
+        const learnPane = document.getElementById('learn-pane');
+        const ddlPane = document.getElementById('ddl-pane');
+        const codePane = document.getElementById('code-pane');
+        const dataPane = document.getElementById('data-pane');
+        const errorsPane = document.getElementById('errors-pane');
+        const mcqPane = document.getElementById('mcq-pane');
+        
+        const tabs = document.querySelectorAll('.tab');
+        const contentPanes = document.querySelectorAll('.content-pane');
+
+        const prevLevelBtn = document.getElementById('prev-level-btn');
+        const nextLevelBtn = document.getElementById('next-level-btn');
+
+        let currentWorld = null;
+        let currentLevelIndex = 0;
+
+        function init() {
+            worldsContainer.innerHTML = ''; 
+            for (const worldName in gameData) {
+                const world = gameData[worldName];
+                const card = document.createElement('div');
+                card.className = 'world-card';
+                card.innerHTML = `
+                    <div class="world-icon">${world.icon}</div>
+                    <h3 class="world-title">${worldName}</h3>
+                    <p class="world-desc">${world.description}</p>
+                `;
+                card.addEventListener('click', () => selectWorld(worldName));
+                worldsContainer.appendChild(card);
+            }
+
+            backToMenuBtn.addEventListener('click', showMenu);
+            tabs.forEach(tab => tab.addEventListener('click', () => selectTab(tab.dataset.tab)));
+            prevLevelBtn.addEventListener('click', () => changeLevel(-1));
+            nextLevelBtn.addEventListener('click', () => changeLevel(1));
+        }
+
+        function selectWorld(worldName) {
+            currentWorld = worldName;
+            currentLevelIndex = 0;
+            levelSelectScreen.classList.remove('active');
+            gameScreen.classList.add('active');
+            loadLevel();
+        }
+
+        function showMenu() {
+            gameScreen.classList.remove('active');
+            levelSelectScreen.classList.add('active');
+        }
+
+        function loadLevel() {
+            const world = gameData[currentWorld];
+            const level = world.levels[currentLevelIndex];
+
+            levelTitle.textContent = `${level.name}`;
+            levelSubtitle.textContent = `${currentWorld} Command - ${currentLevelIndex + 1} of ${world.levels.length}`;
+
+            // Populate all panes
+            learnPane.innerHTML = `<p class="text-xl">${level.learn}</p>`;
+            
+            // DDL Pane - Static content for the entire game
+            ddlPane.innerHTML = `<h5 class="text-xl font-semibold mb-2 text-accent">Database & Table Creation (DDL)</h5><div class="code-block"><pre><code>${ddlScript}</code></pre></div>`;
+            
+            codePane.innerHTML = `<h5 class="text-xl font-semibold mb-2 text-secondary">SQL Syntax & Example</h5><div class="code-block"><pre><code>${level.code}</code></pre></div>`;
+            dataPane.innerHTML = dmlTablesHTML; // The table structure context
+            errorsPane.innerHTML = `<h5 class="text-xl font-semibold mb-2 text-red-400">Common Errors & Pitfalls</h5>${level.errors}`;
+            
+            // MCQ Pane - Dynamic content
+            mcqPane.innerHTML = generateMCQ(level.mcq);
+            
+            prevLevelBtn.disabled = currentLevelIndex === 0;
+            nextLevelBtn.disabled = currentLevelIndex === world.levels.length - 1;
+            
+            selectTab('learn');
+        }
+
+        function generateMCQ(mcqData) {
+            let html = `<h5 class="text-xl font-bold mb-4 text-primary">Question:</h5>`;
+            html += `<p class="text-2xl font-semibold mb-6">${mcqData.question}</p>`;
+            
+            // Shuffle options to prevent correct answer always being in the same position
+            const shuffledOptions = [...mcqData.options].sort(() => Math.random() - 0.5);
+
+            html += `<div class="options-container flex flex-col items-start">`;
+            shuffledOptions.forEach(option => {
+                html += `<button class="option-btn" onclick="checkAnswer(this, '${mcqData.answer}')">${option}</button>`;
+            });
+            html += `</div>`;
+            return html;
+        }
+
+        function selectTab(tabName) {
+            tabs.forEach(tab => tab.classList.toggle('active', tab.dataset.tab === tabName));
+            contentPanes.forEach(pane => pane.classList.toggle('active', pane.id === `${tabName}-pane`));
+        }
+
+        function checkAnswer(button, correctAnswer) {
+            const buttons = button.parentElement.querySelectorAll('.option-btn');
+            
+            // Disable all buttons immediately
+            buttons.forEach(btn => btn.disabled = true);
+
+            if (button.textContent === correctAnswer) {
+                button.classList.add('correct');
+                // Optional: Automatically move to the next level/command after a delay
+                /* setTimeout(() => {
+                    if (currentLevelIndex < gameData[currentWorld].levels.length - 1) {
+                        changeLevel(1);
+                    }
+                }, 1000);
+                */
+            } else {
+                button.classList.add('wrong');
+                // Highlight the correct answer
+                buttons.forEach(btn => {
+                    if(btn.textContent === correctAnswer) {
+                        btn.classList.add('correct');
+                    }
+                });
+            }
+        }
+
+
+        function changeLevel(direction) {
+            const world = gameData[currentWorld];
+            const newIndex = currentLevelIndex + direction;
+            if (newIndex >= 0 && newIndex < world.levels.length) {
+                currentLevelIndex = newIndex;
+                loadLevel();
+            }
+        }
+
+        init();
+    </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" integrity="sha512-ZpsOmlRQV6y907TI0dKBHq9Md29nnaEIPlkf84rnaERnq6zvWvPUqr2ft8M1aS28oN72PdrCzSjY4U6VaAw1EQ==" data-cf-beacon='{"version":"2024.11.0","token":"499e684b7b1043878977050a0a606794","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
